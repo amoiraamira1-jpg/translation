@@ -1,0 +1,27 @@
+name: screen_translator
+description: Floating screen translator (OCR + on-device translation), no paid APIs.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  shared_preferences: ^2.2.3   # settings persistence (works on Web via localStorage too)
+  http: ^1.2.2                 # Microsoft Translator HTTP calls in TranslationService
+  # Native ML Kit text-recognition / translation are used on the Android side
+  # (see android/app/.../OcrEngine.kt and TranslateEngine.kt) because the
+  # floating overlay is a native foreground service that must keep running
+  # even while the Flutter UI is closed. lib/main.dart in this build is the
+  # Web/UI-preview layer and does not call into that native service.
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
