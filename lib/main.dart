@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
+
+const MethodChannel _nativeChannel = MethodChannel('screen_translator/native');
 
 void main() {
   runApp(const ScreenTranslatorApp());
@@ -48,6 +51,18 @@ const Map<String, IconData> kIconChoices = {
   'camera': Icons.camera_alt,
   'translate': Icons.translate,
   'language': Icons.language,
+  'circle': Icons.circle,
+  'circle_outlined': Icons.circle_outlined,
+  'adjust': Icons.adjust,
+  'radio': Icons.radio_button_checked,
+  'blur': Icons.blur_circular,
+  'donut': Icons.donut_large,
+  'star': Icons.star,
+  'favorite': Icons.favorite,
+  'bolt': Icons.bolt,
+  'public': Icons.public,
+  'chat': Icons.chat_bubble,
+  'mic': Icons.mic,
 };
 
 const List<Color> kColorChoices = [
@@ -72,6 +87,9 @@ class AppSettings extends ChangeNotifier {
   String iconName = 'target';
   int iconColorValue = 0xDD000000; // Colors.black87
 
+  double iconSize = 52;
+  double iconTransparency = 100;
+
   bool autoMoveEdge = true;
   bool autoRegionMode = true;
   bool accessibilityMode = false;
@@ -94,6 +112,8 @@ class AppSettings extends ChangeNotifier {
     targetLang = p.getString('target_lang') ?? targetLang;
     iconName = p.getString('icon_name') ?? iconName;
     iconColorValue = p.getInt('icon_color') ?? iconColorValue;
+    iconSize = (p.getInt('icon_size') ?? 52).toDouble();
+    iconTransparency = (p.getInt('icon_transparency') ?? 100).toDouble();
     autoMoveEdge = p.getBool('auto_move_edge') ?? autoMoveEdge;
     autoRegionMode = p.getBool('auto_region_mode') ?? autoRegionMode;
     accessibilityMode = p.getBool('accessibility_mode') ?? accessibilityMode;
@@ -137,6 +157,18 @@ class AppSettings extends ChangeNotifier {
     _saveInt('icon_color', color.toARGB32());
   }
 
+  void setIconSize(double size) {
+    iconSize = size;
+    notifyListeners();
+    _saveInt('icon_size', size.round());
+  }
+
+  void setIconTransparency(double value) {
+    iconTransparency = value;
+    notifyListeners();
+    _saveInt('icon_transparency', value.round());
+  }
+
   void setMicrosoftKey(String key) {
     microsoftApiKey = key;
     notifyListeners();
@@ -149,8 +181,24 @@ class AppSettings extends ChangeNotifier {
     _saveString('ms_region', region);
   }
 
-  void toggleRunning() {
-    running = !running;
+  Future<void> toggleRunning() async {
+    if (!running) {
+      if (!kIsWeb) {
+        final hasPermission =
+            await _nativeChannel.invokeMethod('hasOverlayPermission') as bool? ?? false;
+        if (!hasPermission) {
+          await _nativeChannel.invokeMethod('requestOverlayPermission');
+          return;
+        }
+        await _nativeChannel.invokeMethod('startOverlayService');
+      }
+      running = true;
+    } else {
+      if (!kIsWeb) {
+        await _nativeChannel.invokeMethod('stopOverlayService');
+      }
+      running = false;
+    }
     notifyListeners();
   }
 
@@ -188,6 +236,7 @@ class TranslationService {
     required String text,
     required AppSettings settings,
   }) async {
+    if (settings.engineId == 'google') { return _translateWithGoogleFree(text: text, from: settings.sourceLang, to: settings.targetLang); }
     if (settings.engineId == 'microsoft') {
       return _translateWithMicrosoft(
         text: text,
@@ -203,6 +252,28 @@ class TranslationService {
       "Microsoft Translator key in Settings to try a live translation, or "
       "wire this engine's API in TranslationService the same way.",
     );
+  }
+
+  static Future<String> _translateWithGoogleFree({
+    required String text,
+    required String from,
+    required String to,
+  }) async {
+    final uri = Uri.parse(
+      'https://translate.googleapis.com/translate_a/single'
+      '?client=gtx&sl=$from&tl=$to&dt=t&q=${Uri.encodeComponent(text)}',
+    );
+    final response = await http.get(uri);
+    if (response.statusCode != 200) {
+      throw Exception('Google Translate error: HTTP ${response.statusCode}');
+    }
+    final decoded = jsonDecode(response.body) as List;
+    final segments = decoded[0] as List;
+    final buffer = StringBuffer();
+    for (final seg in segments) {
+      buffer.write((seg as List)[0]);
+    }
+    return buffer.toString();
   }
 
   static Future<String> _translateWithMicrosoft({
@@ -564,8 +635,8 @@ class _HomeTabState extends State<HomeTab> {
     super.dispose();
   }
 
-  void _togglePower() {
-    widget.settings.toggleRunning();
+  void _togglePower() async {
+    await widget.settings.toggleRunning();
     if (kIsWeb) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -663,6 +734,58 @@ class _HomeTabState extends State<HomeTab> {
             trailing: CircleAvatar(radius: 12, backgroundColor: settings.iconColor),
             onTap: () => showColorPicker(context, settings),
           ),
+          Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Icon size'),
+                      Text('${settings.iconSize.round()}'),
+                    ],
+                  ),
+                  Slider(
+                    value: settings.iconSize,
+                    min: 30,
+                    max: 100,
+                    divisions: 70,
+                    label: settings.iconSize.round().toString(),
+                    onChanged: (value) => settings.setIconSize(value),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Icon transparency'),
+                      Text('${settings.iconTransparency.round()}'),
+                    ],
+                  ),
+                  Slider(
+                    value: settings.iconTransparency,
+                    min: 0,
+                    max: 100,
+                    divisions: 100,
+                    label: settings.iconTransparency.round().toString(),
+                    onChanged: (value) => settings.setIconTransparency(value),
+                  ),
+                ],
+              ),
+            ),
+          ),
           switchCard(
             title: 'Auto-move to screen edge and dim',
             value: settings.autoMoveEdge,
@@ -685,39 +808,6 @@ class _HomeTabState extends State<HomeTab> {
             subtitle: 'Apply when translating Chinese, Japanese, Korean',
             value: settings.verticalText,
             onChanged: settings.toggleVerticalText,
-          ),
-
-          sectionHeader('Microsoft Translator'),
-          Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: _keyController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Microsoft Translator API Key',
-                      border: OutlineInputBorder(),
-                      helperText: 'From your Azure Translator resource.',
-                    ),
-                    onChanged: settings.setMicrosoftKey,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _regionController,
-                    decoration: const InputDecoration(
-                      labelText: 'Region (optional)',
-                      border: OutlineInputBorder(),
-                      helperText: 'Only needed for some resource types, e.g. "westeurope".',
-                    ),
-                    onChanged: settings.setMicrosoftRegion,
-                  ),
-                ],
-              ),
-            ),
           ),
 
           Padding(
