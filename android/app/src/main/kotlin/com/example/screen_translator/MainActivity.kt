@@ -28,9 +28,7 @@ class MainActivity : FlutterActivity() {
                 }
 
                 "startOverlayService" -> {
-                    startActivity(Intent(this, ScreenCaptureActivity::class.java).apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    })
+                    startActivity(Intent(this, ScreenCaptureActivity::class.java))
                     result.success(null)
                 }
 

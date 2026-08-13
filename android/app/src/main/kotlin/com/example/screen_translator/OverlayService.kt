@@ -108,7 +108,7 @@ class OverlayService : Service() {
         val sizePx = dp(Prefs.iconSize(this))
         val icon = ImageView(this).apply {
             setImageResource(android.R.drawable.ic_menu_camera) // swap for a custom target/crosshair asset
-            alpha = 1f - (Prefs.iconTransparency(this@OverlayService) / 100f)
+            alpha = (Prefs.iconTransparency(this@OverlayService) / 100f).coerceIn(0.15f, 1f)
             layoutParams = FrameLayout.LayoutParams(sizePx, sizePx)
         }
 
@@ -150,7 +150,7 @@ class OverlayService : Service() {
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     cancelAutoMove()
-                    icon.alpha = 1f - (Prefs.iconTransparency(this) / 100f)
+                    icon.alpha = (Prefs.iconTransparency(this) / 100f).coerceIn(0.15f, 1f)
                     downX = event.rawX; downY = event.rawY
                     startX = params.x; startY = params.y
                     moved = false; longPressTriggered = false
@@ -242,9 +242,7 @@ class OverlayService : Service() {
         }
         // Need user consent first; ScreenCaptureActivity forwards the token
         // back to us via ACTION_CAPTURE_GRANTED, and performCapture() runs then.
-        startActivity(Intent(this, ScreenCaptureActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        })
+        startActivity(Intent(this, ScreenCaptureActivity::class.java))
     }
 
     private fun attachProjection(resultCode: Int, data: Intent) {
