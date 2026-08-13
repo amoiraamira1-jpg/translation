@@ -59,19 +59,32 @@ class OverlayService : Service() {
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        startForeground(NOTIF_ID, buildNotification())
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_START -> showFloatingIcon()
+            ACTION_START -> {
+                if (mediaProjection != null) {
+                    startForeground(NOTIF_ID, buildNotification())
+                    showFloatingIcon()
+                } else {
+                    startActivity(Intent(this, ScreenCaptureActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    })
+                    stopSelf()
+                }
+            }
             ACTION_STOP -> stopSelf()
             ACTION_CAPTURE_GRANTED -> {
+                startForeground(NOTIF_ID, buildNotification())
                 val code = intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
                 val data = intent.getParcelableExtra<Intent>(EXTRA_RESULT_DATA)
                 if (code == Activity.RESULT_OK && data != null) {
                     attachProjection(code, data)
+                    showFloatingIcon()
                     performCapture(pendingRegionAnchor?.let { lastRegionRect } )
+                } else {
+                    stopSelf()
                 }
             }
         }

@@ -28,11 +28,9 @@ class MainActivity : FlutterActivity() {
                 }
 
                 "startOverlayService" -> {
-                    val intent = Intent(this, OverlayService::class.java).apply {
-                        action = OverlayService.ACTION_START
-                    }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent)
-                    else startService(intent)
+                    startActivity(Intent(this, ScreenCaptureActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    })
                     result.success(null)
                 }
 
